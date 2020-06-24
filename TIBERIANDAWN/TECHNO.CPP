@@ -4498,7 +4498,10 @@ int TechnoClass::Refund_Amount(void) const
 	*/
 	cost += Fixed_To_Cardinal(UnitTypeClass::FULL_LOAD_CREDITS, Tiberium_Load())/2;
 
-	if (House->IsHuman) {
+#ifndef DISABLE_AI_CHEATS_MOD
+	if (House->IsHuman)
+#endif
+	{
 		cost /= 2;
 	}
 	return(cost);

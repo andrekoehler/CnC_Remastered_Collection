@@ -236,11 +236,12 @@ void FactoryClass::AI(void)
 
 		/*
 		**	Determine the acceleration factor for factory production.
-		**	This applies only to human players. The computer builds
-		**	units on a building by building basis -- quantity of building
-		**	factory types doesn't affect individual factories.
 		*/
-		if (Object && House->IsHuman) {
+		if (Object
+#ifndef DISABLE_AI_CHEATS_MOD
+			&& House->IsHuman
+#endif
+			) {
 			switch (Object->What_Am_I()) {
 				case RTTI_AIRCRAFT:
 					stages = House->AircraftFactories;

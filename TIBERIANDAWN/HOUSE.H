@@ -572,6 +572,13 @@ class HouseClass {
 		int Expert_AI(void);
 		COORDINATE Find_Build_Location(BuildingClass * building) const;
 		BuildingClass * Find_Building(StructType type, ZoneType zone=ZONE_NONE) const;
+
+#ifdef DISABLE_AI_CHEATS_MOD
+		BuildingClass* Find_Best_Production_Building(RTTIType typeToBuild) const;
+		void Start_Building_New_Suggested_Object(RTTIType typeToBuild);
+		bool Is_Any_Factory_Currently_Building(RTTIType typeToBuild) const;
+		void AI_Building_In_Campaign(void);
+#endif
 		int AI_Building(void);
 		int AI_Unit(void);
 		int AI_Vessel(void);

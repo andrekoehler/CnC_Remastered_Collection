@@ -1188,7 +1188,10 @@ void BuildingClass::AI(void)
 					Factory = 0;
 				}
 
-			} else {
+			}
+#ifndef DISABLE_AI_CHEATS_MOD
+			else
+			{
 
 				/*
 				**	Only look to start production if there is at least a small amount of
@@ -1218,6 +1221,7 @@ void BuildingClass::AI(void)
 					}
 				}
 			}
+#endif
 		}
 	}
 

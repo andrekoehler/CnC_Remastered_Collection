@@ -1601,6 +1601,17 @@ void HouseClass::AI(void)
 	}
 #endif
 
+#ifdef DISABLE_AI_CHEATS_MOD
+	if (GameToPlay == GAME_NORMAL && IsHuman == false) {
+		/*
+		**	Start building stuff, but only one type at a time
+		**  instead of building multiple objects of the same type
+		**  in parallel as in the original code.
+		*/
+		AI_Building_In_Campaign();
+	}
+#endif
+
 	/*
 	**	If the production possibilities need to be recalculated, then do so now. This must
 	**	occur after the scan bits have been properly updated.
@@ -6212,6 +6223,92 @@ int HouseClass::AI_Base_Defense(void)
 	}
 
 	return(TICKS_PER_SECOND*5);
+}
+#endif
+
+
+#ifdef DISABLE_AI_CHEATS_MOD
+BuildingClass* HouseClass::Find_Best_Production_Building(RTTIType whatToBuild) const
+{
+	// TODO: use the factory where the unit comes out closest to its objective
+
+	// easy implementation for now: always use the last building that was constructed
+	for (int i = Buildings.Count() - 1; i >= 0; --i)
+	{
+		BuildingClass * building = Buildings.Ptr(i);
+		if (building && building->House == this && building->Class->ToBuild == whatToBuild)
+		{
+			return building;
+		}
+	}
+	return nullptr;
+}
+
+
+void HouseClass::Start_Building_New_Suggested_Object(RTTIType typeToBuild)
+{
+	TechnoTypeClass const* techno = Suggest_New_Object(typeToBuild);
+
+	/*
+	**	If a suitable object type was selected for production, then start
+	**	producing it now.
+	*/
+	if (techno) {
+		BuildingClass* buildingToStartProductionAt = Find_Best_Production_Building(typeToBuild);
+		if (buildingToStartProductionAt)
+		{
+			FactoryClass* factory = new FactoryClass;
+			if (factory) {
+				buildingToStartProductionAt->Factory = factory;
+				if (!factory->Set(*techno, *this)) {
+					delete factory;
+					buildingToStartProductionAt->Factory = nullptr;
+				}
+				else
+				{
+#ifdef USE_RA_AI
+					Production_Begun(factory->Get_Object());		// Added for RA AI in TD. ST - 7/26/2019 9:46AM
+#endif
+					factory->Start();
+				}
+			}
+		}
+	}
+}
+
+
+bool HouseClass::Is_Any_Factory_Currently_Building(RTTIType typeToBuild) const
+{
+	for (int i = 0; i < Buildings.Count(); ++i)
+	{
+		BuildingClass * building = Buildings.Ptr(i);
+		if (building && building->House == this && building->Factory != nullptr)
+		{
+			if (building->Class->ToBuild == typeToBuild) return true;
+		}
+	}
+	return false;
+}
+
+
+void HouseClass::AI_Building_In_Campaign(void)
+{
+	/*
+	**	Only look to start production if there is at least a small amount of
+	**	money available. In cases where there is no practical money left, then
+	**	production can never complete -- don't bother starting it.
+	*/
+	if (IsStarted && Available_Money() > 10) {
+		const RTTIType buildableTypes[4] = { RTTI_BUILDINGTYPE, RTTI_INFANTRYTYPE, RTTI_UNITTYPE, RTTI_AIRCRAFTTYPE };
+		for (int iType = 0; iType < 4; ++iType)
+		{
+			const RTTIType buildableType = buildableTypes[iType];
+			if (!Is_Any_Factory_Currently_Building(buildableType))
+			{
+				Start_Building_New_Suggested_Object(buildableType);
+			}
+		}
+	}
 }
 #endif
 

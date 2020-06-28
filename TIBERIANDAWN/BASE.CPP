@@ -485,7 +485,7 @@ BaseNodeClass * BaseClass::Get_Node(BuildingClass *obj)
  * HISTORY:                                                                                    *
  *   03/24/1995 BRR : Created.                                                                 *
  *=============================================================================================*/
-BaseNodeClass * BaseClass::Next_Buildable(StructType type)
+BaseNodeClass* BaseClass::Next_Buildable(StructType type)
 {
 	/*
 	** Loop through all node entries, returning a pointer to the first
@@ -497,25 +497,32 @@ BaseNodeClass * BaseClass::Next_Buildable(StructType type)
 		** For STRUCT_NONE, return the first hole found
 		*/
 		if (type == STRUCT_NONE) {
-			if (!Is_Built(i)) {
-				return(&Nodes[i]);
+#ifdef DISABLE_AI_CHEATS_MOD
+			if (BuildingTypeClass::As_Reference(Nodes[i].Type).IsBuildable) {
+#endif
+				if (!Is_Built(i)) {
+					return(&Nodes[i]);
+				}
+#ifdef DISABLE_AI_CHEATS_MOD
 			}
+#endif
 
-		} else {
+		}
+		else {
 
 			/*
 			** For a "real" building type, return the first hold for that type
 			*/
-			if (Nodes[i].Type==type && !Is_Built(i)) {
+			if (Nodes[i].Type == type && !Is_Built(i)) {
 				return(&Nodes[i]);
 			}
 		}
 	}
 
 
-// If no entry could be found, then create a fake one that will allow
-// placement of the building. Make it static and reuse the next time this
-// routine is called.
+	// If no entry could be found, then create a fake one that will allow
+	// placement of the building. Make it static and reuse the next time this
+	// routine is called.
 
 	return(NULL);
 }

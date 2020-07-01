@@ -1116,6 +1116,7 @@ void BuildingClass::AI(void)
 		}
 	}
 
+#ifndef DISABLE_AI_CHEATS_MOD
 	/*
 	**	Handle any production tied to this building. Only computer controlled buildings have
 	**	production attached to the building itself. The player uses the sidebar interface for
@@ -1148,6 +1149,7 @@ void BuildingClass::AI(void)
 
 		}
 	}
+#endif
 
 	/*
 	**	For computer controlled buildings, determine what should be produced and start
@@ -1171,6 +1173,7 @@ void BuildingClass::AI(void)
 			}
 		}
 
+#ifndef DISABLE_AI_CHEATS_MOD
 		/*
 		**	Buildings that produce other objects have special factory logic handled here.
 		*/
@@ -1189,7 +1192,6 @@ void BuildingClass::AI(void)
 				}
 
 			}
-#ifndef DISABLE_AI_CHEATS_MOD
 			else
 			{
 
@@ -1221,8 +1223,8 @@ void BuildingClass::AI(void)
 					}
 				}
 			}
-#endif
 		}
+#endif
 	}
 
 	/*

@@ -421,7 +421,7 @@ class HouseClass {
 		/*---------------------------------------------------------------------
 		**	Member function prototypes.
 		*/
-		ProdFailType  Begin_Production(RTTIType type, int id);
+		ProdFailType  Begin_Production(RTTIType type, int id, TechnoClass const** product_started = nullptr);
 		ProdFailType  Suspend_Production(RTTIType type);
 		ProdFailType  Abandon_Production(RTTIType type);
 		bool  Place_Object(RTTIType type, CELL cell);
@@ -574,9 +574,6 @@ class HouseClass {
 		BuildingClass * Find_Building(StructType type, ZoneType zone=ZONE_NONE) const;
 
 #ifdef DISABLE_AI_CHEATS_MOD
-		BuildingClass* Find_Best_Production_Building(RTTIType typeToBuild) const;
-		void Start_Building_New_Suggested_Object(RTTIType typeToBuild);
-		bool Is_Any_Factory_Currently_Building(RTTIType typeToBuild) const;
 		void AI_Building_In_Campaign(void);
 #endif
 		int AI_Building(void);

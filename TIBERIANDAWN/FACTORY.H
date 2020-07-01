@@ -92,6 +92,13 @@ class FactoryClass : private StageClass
 		*/
 		unsigned IsActive:1;
 
+#ifdef DISABLE_AI_CHEATS_MOD
+		/*
+		**	This is the countdown timer that regulates placement retry logic.
+		*/
+		TCountDownTimerClass PlacementDelay;
+#endif
+
 	protected:
 		enum StepCountEnum {
 			STEP_COUNT=108			// Number of steps to break production down into.
@@ -155,7 +162,11 @@ class FactoryClass : private StageClass
 		/*
 		** Some additional padding in case we need to add data to the class and maintain backwards compatibility for save/load
 		*/
-		unsigned char SaveLoadPadding[32];
+		unsigned char SaveLoadPadding[32
+#ifdef DISABLE_AI_CHEATS_MOD
+			-sizeof(TCountDownTimerClass)
+#endif
+		];
 };
 
 #endif

@@ -111,6 +111,9 @@ FactoryClass::FactoryClass(void)
 	SpecialItem = SPC_NONE;
 	Object 		= NULL;
 	House			= NULL;
+#ifdef DISABLE_AI_CHEATS_MOD
+	PlacementDelay = 0;
+#endif
 	Set_Rate(0);
 	Set_Stage(0);
 }

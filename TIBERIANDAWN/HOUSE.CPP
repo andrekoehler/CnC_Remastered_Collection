@@ -1602,7 +1602,7 @@ void HouseClass::AI(void)
 #endif
 
 #ifdef DISABLE_AI_CHEATS_MOD
-	if (GameToPlay == GAME_NORMAL && IsHuman == false) {
+	if (GameToPlay == GAME_NORMAL && !IsHuman) {
 		/*
 		**	Start building stuff, but only one type at a time
 		**  instead of building multiple objects of the same type
@@ -2319,8 +2319,10 @@ void HouseClass::Adjust_Threat(int region, int threat)
  * HISTORY:                                                                                    *
  *   05/08/1995 JLB : Created.                                                                 *
  *=============================================================================================*/
-ProdFailType HouseClass::Begin_Production(RTTIType type, int id)
+ProdFailType HouseClass::Begin_Production(RTTIType type, int id, TechnoClass const** product_started)
 {
+	if (product_started) *product_started = nullptr;
+
 	Validate();
 	int * factory = 0;
 	int result = true;
@@ -2402,6 +2404,8 @@ ProdFailType HouseClass::Begin_Production(RTTIType type, int id)
 				Map.Factory_Link(*factory, type, id);
 			}
 		}
+
+		if (product_started && fptr) *product_started = fptr->Get_Object();
 
 		return(PROD_OK);
 	}
@@ -2814,10 +2818,12 @@ bool HouseClass::Place_Object(RTTIType type, CELL cell)
 	Validate();
 	TechnoClass * tech = 0;
 	FactoryClass * factory = 0;
+	int * factoryIndex = nullptr;
 
 	switch (type) {
 		case RTTI_AIRCRAFT:
 		case RTTI_AIRCRAFTTYPE:
+			factoryIndex = &AircraftFactory;
 			if (AircraftFactory != -1) {
 				factory = Factories.Raw_Ptr(AircraftFactory);
 			}
@@ -2825,6 +2831,7 @@ bool HouseClass::Place_Object(RTTIType type, CELL cell)
 
 		case RTTI_INFANTRY:
 		case RTTI_INFANTRYTYPE:
+			factoryIndex = &InfantryFactory;
 			if (InfantryFactory != -1) {
 				factory = Factories.Raw_Ptr(InfantryFactory);
 			}
@@ -2832,6 +2839,7 @@ bool HouseClass::Place_Object(RTTIType type, CELL cell)
 
 		case RTTI_UNIT:
 		case RTTI_UNITTYPE:
+			factoryIndex = &UnitFactory;
 			if (UnitFactory != -1) {
 				factory = Factories.Raw_Ptr(UnitFactory);
 			}
@@ -2839,6 +2847,7 @@ bool HouseClass::Place_Object(RTTIType type, CELL cell)
 
 		case RTTI_BUILDING:
 		case RTTI_BUILDINGTYPE:
+			factoryIndex = &BuildingFactory;
 			if (BuildingFactory != -1) {
 				factory = Factories.Raw_Ptr(BuildingFactory);
 			}
@@ -2853,53 +2862,93 @@ bool HouseClass::Place_Object(RTTIType type, CELL cell)
 	**	The second placement event should NOT try to place the object that is
 	**	just starting construction.
 	*/
-	if (factory && factory->Has_Completed()) {
+	if (factory && factory->Has_Completed()
+#ifdef DISABLE_AI_CHEATS_MOD
+		&& (IsHuman || factory->PlacementDelay.Expired())
+#endif
+		) {
 		tech = factory->Get_Object();
 
 		if (cell == -1) {
 			TechnoClass * pending = factory->Get_Object();
 			if (pending) {
 				TechnoClass * builder = pending->Who_Can_Build_Me(false, false);
+				if (!builder) return(false);
 				TechnoTypeClass const *object_type = pending->Techno_Type_Class();
 
-				if (builder && builder->Exit_Object(pending)) {
+				const int exitResult = builder->Exit_Object(pending);
+#ifdef DISABLE_AI_CHEATS_MOD
+				if (IsHuman)
+#endif
+				{
+					if (exitResult) {
 
-					/*
-					**	Since the object has left the factory under its own power, delete
-					**	the production manager tied to this slot in the sidebar. Its job
-					**	has been completed.
-					*/
-					factory->Set_Is_Blocked(false);
-					factory->Completed();
-					Abandon_Production(type);
+						/*
+						**	Since the object has left the factory under its own power, delete
+						**	the production manager tied to this slot in the sidebar. Its job
+						**	has been completed.
+						*/
+						factory->Set_Is_Blocked(false);
+						factory->Completed();
+						Abandon_Production(type);
 
-					/*
-					** Could be tied to an achievement. ST - 11/11/2019 11:56AM
-					*/
-					if (IsHuman) {
-						if (object_type) {
-							On_Achievement_Event(this, "UNIT_CONSTRUCTED", object_type->IniName);
+						/*
+						** Could be tied to an achievement. ST - 11/11/2019 11:56AM
+						*/
+						if (IsHuman) {
+							if (object_type) {
+								On_Achievement_Event(this, "UNIT_CONSTRUCTED", object_type->IniName);
+							}
+							if (pending->IsActive) {
+								On_Ping(this, pending->Center_Coord());
+							}
 						}
-						if (pending->IsActive) {
-							On_Ping(this, pending->Center_Coord());
-						}
+
 					}
+					else {
 
-				} else {
+						/*
+						**	The object could not leave under it's own power. Just wait
+						**	until the player tries to place the object again.
+						*/
 
-					/*
-					**	The object could not leave under it's own power. Just wait
-					**	until the player tries to place the object again.
-					*/
-					
-					/*
-					** Flag that it's blocked so we can re-try the exit later.
-					** This would have been a bad idea under the old peer-peer code since it would have pumped events into
-					** the queue too often. ST - 2/25/2020 11:56AM
-					*/
-					factory->Set_Is_Blocked(true);
-					return(false);
+						/*
+						** Flag that it's blocked so we can re-try the exit later.
+						** This would have been a bad idea under the old peer-peer code since it would have pumped events into
+						** the queue too often. ST - 2/25/2020 11:56AM
+						*/
+						factory->Set_Is_Blocked(true);
+						return(false);
+					}
 				}
+#ifdef DISABLE_AI_CHEATS_MOD
+				else
+				{
+					switch (exitResult)
+					{
+					case 0:
+						/*
+						**	If the object could not leave the factory, then either request
+						**	a transport, place the (what must be a) building using another method, or
+						**	abort the production and refund money.
+						*/
+						factory->Abandon();
+						delete factory;
+						*factoryIndex = -1;
+						return(false);
+
+					case 1:
+						factory->PlacementDelay = TICKS_PER_SECOND * 3;
+						return(false);
+
+					case 2:
+						factory->Completed();
+						delete factory;
+						*factoryIndex = -1;
+						return(true);
+					}
+				}
+#endif
 			}
 
 		} else {
@@ -6228,84 +6277,109 @@ int HouseClass::AI_Base_Defense(void)
 
 
 #ifdef DISABLE_AI_CHEATS_MOD
-BuildingClass* HouseClass::Find_Best_Production_Building(RTTIType whatToBuild) const
-{
-	// TODO: use the factory where the unit comes out closest to its objective
-
-	// easy implementation for now: always use the last building that was constructed
-	for (int i = Buildings.Count() - 1; i >= 0; --i)
-	{
-		BuildingClass * building = Buildings.Ptr(i);
-		if (building && building->House == this && building->Class->ToBuild == whatToBuild)
-		{
-			return building;
-		}
-	}
-	return nullptr;
-}
-
-
-void HouseClass::Start_Building_New_Suggested_Object(RTTIType typeToBuild)
-{
-	TechnoTypeClass const* techno = Suggest_New_Object(typeToBuild);
-
-	/*
-	**	If a suitable object type was selected for production, then start
-	**	producing it now.
-	*/
-	if (techno) {
-		BuildingClass* buildingToStartProductionAt = Find_Best_Production_Building(typeToBuild);
-		if (buildingToStartProductionAt)
-		{
-			FactoryClass* factory = new FactoryClass;
-			if (factory) {
-				buildingToStartProductionAt->Factory = factory;
-				if (!factory->Set(*techno, *this)) {
-					delete factory;
-					buildingToStartProductionAt->Factory = nullptr;
-				}
-				else
-				{
-#ifdef USE_RA_AI
-					Production_Begun(factory->Get_Object());		// Added for RA AI in TD. ST - 7/26/2019 9:46AM
-#endif
-					factory->Start();
-				}
-			}
-		}
-	}
-}
-
-
-bool HouseClass::Is_Any_Factory_Currently_Building(RTTIType typeToBuild) const
-{
-	for (int i = 0; i < Buildings.Count(); ++i)
-	{
-		BuildingClass * building = Buildings.Ptr(i);
-		if (building && building->House == this && building->Factory != nullptr)
-		{
-			if (building->Class->ToBuild == typeToBuild) return true;
-		}
-	}
-	return false;
-}
-
+static const RTTIType BUILDABLE_TYPES[4] = { RTTI_BUILDINGTYPE, RTTI_INFANTRYTYPE, RTTI_UNITTYPE, RTTI_AIRCRAFTTYPE };
 
 void HouseClass::AI_Building_In_Campaign(void)
 {
-	/*
-	**	Only look to start production if there is at least a small amount of
-	**	money available. In cases where there is no practical money left, then
-	**	production can never complete -- don't bother starting it.
-	*/
-	if (IsStarted && Available_Money() > 10) {
-		const RTTIType buildableTypes[4] = { RTTI_BUILDINGTYPE, RTTI_INFANTRYTYPE, RTTI_UNITTYPE, RTTI_AIRCRAFTTYPE };
+	if (IsStarted) {
 		for (int iType = 0; iType < 4; ++iType)
 		{
-			const RTTIType buildableType = buildableTypes[iType];
-			if (!Is_Any_Factory_Currently_Building(buildableType))
+			const RTTIType typeToBuild = BUILDABLE_TYPES[iType];
+			int* factory = nullptr;
+
+			switch (typeToBuild) {
+			case RTTI_AIRCRAFT:
+			case RTTI_AIRCRAFTTYPE:
+				factory = &AircraftFactory;
+				break;
+			case RTTI_UNIT:
+			case RTTI_UNITTYPE:
+				factory = &UnitFactory;
+				break;
+			case RTTI_BUILDING:
+			case RTTI_BUILDINGTYPE:
+				factory = &BuildingFactory;
+				break;
+			case RTTI_INFANTRY:
+			case RTTI_INFANTRYTYPE:
+				factory = &InfantryFactory;
+				break;
+			case RTTI_SPECIAL:
+				factory = &SpecialFactory;
+				break;
+			}
+
+			if (factory == nullptr)
 			{
-				Start_Building_New_Suggested_Object(buildableType);
+				return;
+			}
+			else if (*factory == -1) // factory is not in use
+			{
+				/*
+				**	Only look to start production if there is at least a small amount of
+				**	money available. In cases where there is no practical money left, then
+				**	production can never complete -- don't bother starting it.
+				*/
+				if (Available_Money() > 10)
+				{
+					/*
+					** This is a time consuming routine.
+					*/
+					TechnoTypeClass const* techno = Suggest_New_Object(typeToBuild);
+
+					/*
+					**	If a suitable object type was selected for production, then start
+					**	producing it now.
+					*/
+					if (techno) {
+						int id = -1;
+
+						switch (techno->What_Am_I())
+						{
+						case RTTI_AIRCRAFT:
+						case RTTI_AIRCRAFTTYPE:
+							id = AircraftTypeClass::From_Name(techno->IniName);
+							break;
+						case RTTI_UNIT:
+						case RTTI_UNITTYPE:
+							id = UnitTypeClass::From_Name(techno->IniName);
+							break;
+						case RTTI_INFANTRY:
+						case RTTI_INFANTRYTYPE:
+							id = InfantryTypeClass::From_Name(techno->IniName);
+							break;
+						case RTTI_BUILDING:
+						case RTTI_BUILDINGTYPE:
+							id = BuildingTypeClass::From_Name(techno->IniName);
+							break;
+						}
+
+						if (id != -1)
+						{
+							TechnoClass const* product_started = nullptr;
+							if (PROD_OK == Begin_Production(techno->What_Am_I(), id, &product_started))
+							{
+#ifdef USE_RA_AI
+								Production_Begun(product_started);		// Added for RA AI in TD. ST - 7/26/2019 9:46AM
+#endif
+							}
+						}
+					}
+				}
+			}
+			else if (*factory >= 0)
+			{
+				FactoryClass* const fptr = Factories.Raw_Ptr(*factory);
+
+				if (fptr && fptr->Has_Completed() && fptr->PlacementDelay.Expired()) {
+					/*
+					**	Construction has been completed.
+					**	Try to get the object to automatically leave the factory. Buildings are
+					**	the main exception to the ability to leave the factory under their own
+					**	power.
+					*/
+					Place_Object(fptr->Get_Object()->What_Am_I(), -1);
+				}
 			}
 		}
 	}

@@ -3793,7 +3793,7 @@ TechnoTypeClass const * HouseClass::Suggest_New_Object(RTTIType objecttype) cons
 				int bestcount = 0;
 				InfantryType bestlist[INFANTRY_COUNT];
 				for (InfantryType utype = INFANTRY_FIRST; utype < INFANTRY_COUNT; utype++) {
-					if (counter[utype] > 0 && Can_Build(utype, Class->House) && InfantryTypeClass::As_Reference(utype).Cost_Of() <= Available_Money()) {
+					if (counter[utype] > 0 && InfantryTypeClass::As_Reference(utype).Who_Can_Build_Me(false, false, Class->House) && InfantryTypeClass::As_Reference(utype).Cost_Of() <= Available_Money()) {
 						if (bestval == -1 || bestval < counter[utype]) {
 							bestval = counter[utype];
 							bestcount = 0;

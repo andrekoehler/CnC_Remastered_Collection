@@ -3695,7 +3695,7 @@ TechnoTypeClass const * HouseClass::Suggest_New_Object(RTTIType objecttype) cons
 				int bestcount = 0;
 				UnitType bestlist[UNIT_COUNT];
 				for (UnitType utype = UNIT_FIRST; utype < UNIT_COUNT; utype++) {
-					if (counter[utype] > 0 && Can_Build(utype, Class->House) && UnitTypeClass::As_Reference(utype).Cost_Of() <= Available_Money()) {
+					if (counter[utype] > 0 && UnitTypeClass::As_Reference(utype).Who_Can_Build_Me(false, false, Class->House) && UnitTypeClass::As_Reference(utype).Cost_Of() <= Available_Money()) {
 						if (bestval == -1 || bestval < counter[utype]) {
 							bestval = counter[utype];
 							bestcount = 0;
